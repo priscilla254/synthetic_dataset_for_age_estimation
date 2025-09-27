@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Colab/Drive
+*.ipynb_checkpoints
+.DS_Store
+
+# Big stuff (keep out of repo)
+data/
+outputs/
+checkpoints/
+weights/
+.cache/
