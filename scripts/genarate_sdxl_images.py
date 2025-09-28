@@ -2,6 +2,7 @@
 # scripts/generate_sdxl_images.py
 
 import os
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 import csv
 import argparse
 from pathlib import Path
