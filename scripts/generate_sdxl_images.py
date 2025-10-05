@@ -39,7 +39,7 @@ def set_determinism(enabled: bool = True):
 # -----------------------------
 def load_sdxl(model_id: str, dtype=torch.float16, device: str = "cuda"):
     pipe = StableDiffusionXLPipeline.from_pretrained(
-        model_id, torch_dtype=dtype, use_safetensors=True
+        model_id, dtype=dtype, use_safetensors=True
     ).to(device)
     pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
     return pipe
@@ -91,38 +91,42 @@ def build_prompt(
     genders, ages,
     bg_light_pairs,
     poses, focals, expressions,
-    hairstyles_male, hairstyles_female,ethnicities,
+    hairstyles_male, hairstyles_female, ethnicities,
     force_gender=None,
     force_ethnicity=None,
 ):
+    # choose/force ethnicity
+    ethnicity = force_ethnicity if force_ethnicity else random.choice(ethnicities or ["diverse background"])
+
+    # choose/force gender
     gender = force_gender if force_gender in ["male", "female"] else random.choice(genders or ["person"])
-    # Hairstyles by gender (fallback to generic when missing)
+
+    # hair by gender with safe fallback
     if gender == "male" and hairstyles_male:
         hair = random.choice(hairstyles_male)
     elif gender == "female" and hairstyles_female:
         hair = random.choice(hairstyles_female)
     else:
-        # Generic fallback
-        hair = random.choice([h for h in (hairstyles_male + hairstyles_female) or ["short hair","medium hair","long hair"]])
+        hair = random.choice((hairstyles_male + hairstyles_female) or ["short hair","medium hair","long hair"])
 
-    age = random.choice(ages) if ages else None
-    bg_light = random.choice(bg_light_pairs) if bg_light_pairs else None
-    pose = random.choice(poses) if poses else None
+    age   = random.choice(ages) if ages else None
+    bglt  = random.choice(bg_light_pairs) if bg_light_pairs else None
+    pose  = random.choice(poses) if poses else None
     focal = random.choice(focals) if focals else None
-    expr = random.choice(expressions) if expressions else None
+    expr  = random.choice(expressions) if expressions else None
 
     parts = [
         base_prompt,
         f"portrait of a {gender}" + (f" {age} year old" if age is not None else ""),
+        f"of {ethnicity}",
         expr,
         focal,
-        bg_light,
+        bglt,
         (f"{pose} pose" if pose else None),
         hair,
     ]
-
-    # join non-empty parts, keep commas tidy
     prompt = ", ".join([p for p in parts if p and str(p).strip()])
+
     return prompt, {
         "gender": gender,
         "age": age if age is not None else "",
@@ -130,8 +134,10 @@ def build_prompt(
         "pose": pose or "",
         "focal": focal or "",
         "expression": expr or "",
-        "bg_light": bg_light or "",
+        "bg_light": bglt or "",
+        "ethnicity_intended": ethnicity,  # <-- now present
     }
+
 
 # -----------------------------
 # Single image generation
