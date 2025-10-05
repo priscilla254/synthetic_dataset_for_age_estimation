@@ -2,7 +2,8 @@
 # generate_sdxl_images_wildcards.py
 
 import os
-os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 
 import csv
 import argparse
@@ -38,22 +39,26 @@ def set_determinism(enabled: bool = True):
 # Load model/pipeline
 # -----------------------------
 def load_sdxl(model_id: str, dtype=torch.float16, device: str = "cuda"):
+    # For your diffusers version, use *torch_dtype* (not dtype)
     pipe = StableDiffusionXLPipeline.from_pretrained(
-        model_id, dtype=dtype, use_safetensors=True
+        model_id,
+        torch_dtype=dtype,
+        use_safetensors=True,
+        low_cpu_mem_usage=False,  # avoid the offload_state_dict path that caused earlier errors
     ).to(device)
+
+    # Memory savers that matter on ~15 GB GPUs at 1024x1024
+    pipe.enable_attention_slicing()
+    pipe.vae.enable_slicing()
+    pipe.vae.enable_tiling()
+    try:
+        pipe.unet.to(memory_format=torch.channels_last)
+    except Exception:
+        pass
+
     pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
     return pipe
 
-def set_scheduler(pipe, name: str):
-    if name == "dpm":
-        pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-    elif name == "heun":
-        pipe.scheduler = HeunDiscreteScheduler.from_config(pipe.scheduler.config)
-    elif name == "euler_a":
-        pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
-    else:
-        raise ValueError(f"Unknown scheduler: {name}")
-    return name
 
 # -----------------------------
 # Wildcard file helpers
@@ -284,7 +289,8 @@ def main():
 
             name = f"seed_{seed:06d}.png"
             img.save(str(out_dir / name))
-
+            del img
+            torch.cuda.empty_cache()
             w.writerow([
                 name, seed, prompt, args.neg, args.model, sched_used,
                 steps, cfg, args.width, args.height,
