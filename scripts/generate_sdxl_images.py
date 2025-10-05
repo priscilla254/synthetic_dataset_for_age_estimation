@@ -35,6 +35,22 @@ def set_determinism(enabled: bool = True):
     torch.backends.cudnn.benchmark = False
     torch.use_deterministic_algorithms(enabled)
 
+def set_scheduler(pipe, name: str):
+    from diffusers import (
+        DPMSolverMultistepScheduler,
+        HeunDiscreteScheduler,
+        EulerAncestralDiscreteScheduler,
+    )
+    if name == "dpm":
+        pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+    elif name == "heun":
+        pipe.scheduler = HeunDiscreteScheduler.from_config(pipe.scheduler.config)
+    elif name == "euler_a":
+        pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+    else:
+        raise ValueError(f"Unknown scheduler: {name}")
+    return name
+
 # -----------------------------
 # Load model/pipeline
 # -----------------------------
@@ -42,7 +58,7 @@ def load_sdxl(model_id: str, dtype=torch.float16, device: str = "cuda"):
     # For your diffusers version, use *torch_dtype* (not dtype)
     pipe = StableDiffusionXLPipeline.from_pretrained(
         model_id,
-        torch_dtype=dtype,
+        dtype=dtype,
         use_safetensors=True,
         low_cpu_mem_usage=False,  # avoid the offload_state_dict path that caused earlier errors
     ).to(device)
