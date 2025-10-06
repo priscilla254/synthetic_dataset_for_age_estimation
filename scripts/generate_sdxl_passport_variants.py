@@ -13,7 +13,7 @@ from itertools import cycle
 import torch
 import numpy as np
 from diffusers import StableDiffusionXLPipeline, DPMSolverMultistepScheduler
-
+from pathlib import Path
 
 # ---------------------- Prompt templates ----------------------
 # We keep wording respectful and neutral. Passport-style = straight-on, neutral expression.
@@ -82,10 +82,24 @@ def build_work_items(bg_light_map: dict, genders: list[str], n_per_gender: int):
             items.append({"gender": gender, "background": bg, "lighting": light})
     return items
 
+
+
+def ensure_out_dir(path_str: str) -> Path:
+    path = Path(path_str)
+    # If targeting Google Drive in Colab, mount if not already mounted
+    if str(path).startswith("/content/drive") and not Path("/content/drive/MyDrive").exists():
+        try:
+            from google.colab import drive
+            drive.mount("/content/drive")
+        except Exception:
+            pass  # not Colab or mount failed; we'll still try to mkdir
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
 # ---------------------- Main ----------------------
 def main():
     parser = argparse.ArgumentParser(description="Generate 1024x1024 SDXL passport-style images with controlled gender/background/lighting.")
-    parser.add_argument("--out", required=True, help="Output folder for PNGs (e.g., /content/drive/.../images_1024)")
+    parser.add_argument("--out",default="/content/drive/MyDrive/ai-workspace",help="Output folder for PNGs (e.g., /content/drive/MyDrive/ai-workspace)")
     parser.add_argument("--model", default="stabilityai/stable-diffusion-xl-base-1.0", help="SDXL model id")
     parser.add_argument("--steps", type=int, default=30, help="Diffusion steps")
     parser.add_argument("--cfg", type=float, default=5.0, help="Classifier-free guidance")
@@ -109,8 +123,7 @@ def main():
         "a living room at home": ["soft warm indoor lighting", "colored lighting effects from a TV or neon signs"],
     }
 
-    out_dir = Path(args.out)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = ensure_out_dir(args.out)
     manifest = out_dir / "manifest_passport.csv"
 
     # determinism + model

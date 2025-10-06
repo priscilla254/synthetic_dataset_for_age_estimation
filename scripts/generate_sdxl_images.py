@@ -21,10 +21,16 @@ from diffusers import (
 DEFAULT_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
 
 DEFAULT_BASE_PROMPT = (
-    "studio portrait photo, photorealistic, high detail, realistic skin texture, shallow depth of field"
+    "passport-style headshot, photorealistic, high detail, realistic skin texture, shallow depth of field"
 )
 
-DEFAULT_NEG = "low-res, blurry, watermark, text, extra limbs, distorted"
+DEFAULT_NEG = (illustration, drawing, painting, cgi, render, cartoon, anime, oversharpened,
+overprocessed, plastic skin, beauty filter, hdr, dramatic rim light, profile,
+looking away, head tilted, closed eyes, sunglasses, hat, hair covering face,
+multiple people, duplicate faces, watermark, text, logo, busy background
+deformed eyes, extra pupils, cross-eyed, asymmetrical eyes, lopsided irises
+)
+
 
 # -----------------------------
 # Utility: Determinism toggler
@@ -74,8 +80,25 @@ def load_sdxl(model_id: str, dtype=torch.float16, device: str = "cuda"):
         pass
 
     pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+    refiner = None
+    if args.use_refiner:
+        from diffusers import StableDiffusionXLImg2ImgPipeline
+        refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+            args.refiner_model,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            low_cpu_mem_usage=False,
+        ).to(args.device)
+        try:
+            refiner.enable_xformers_memory_efficient_attention()
+        except Exception:
+            pass
+        refiner.enable_attention_slicing()
+        refiner.vae.enable_slicing()
+        refiner.vae.enable_tiling()
     return pipe
 
+   
 
 # -----------------------------
 # Wildcard file helpers
@@ -164,18 +187,51 @@ def build_prompt(
 # -----------------------------
 # Single image generation
 # -----------------------------
-def generate_one(pipe, prompt, negative_prompt, seed, steps, cfg, width, height):
-    generator = torch.Generator(device=pipe.device).manual_seed(int(seed))
-    image = pipe(
+def generate_one(pipe, prompt, negative_prompt, seed, steps, cfg, width, height,
+                 guidance_rescale=0.0, refiner=None, refiner_steps=20):
+    g = torch.Generator(device=pipe.device).manual_seed(int(seed))
+
+    if refiner is None:
+        # Single-stage (base only)
+        result = pipe(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            num_inference_steps=int(steps),
+            guidance_scale=float(cfg),
+            guidance_rescale=float(guidance_rescale) if guidance_rescale > 0 else None,
+            width=int(width),
+            height=int(height),
+            generator=g,
+        )
+        return result.images[0]
+
+    # Two-stage: Base does 80%, Refiner cleans final details (eyes/skin)
+    base = pipe(
         prompt=prompt,
         negative_prompt=negative_prompt,
         num_inference_steps=int(steps),
         guidance_scale=float(cfg),
+        guidance_rescale=float(guidance_rescale) if guidance_rescale > 0 else None,
         width=int(width),
         height=int(height),
-        generator=generator,
+        denoising_end=0.8,            # stop early, handoff to refiner
+        generator=g,
+        output_type="latent"          # keep latents for refiner
+    )
+
+    image = refiner(
+        prompt=prompt,
+        negative_prompt=negative_prompt,
+        image=base.latents,           # latents from base
+        num_inference_steps=int(refiner_steps),
+        guidance_scale=float(cfg),    # same CFG works well
+        guidance_rescale=float(guidance_rescale) if guidance_rescale > 0 else None,
+        denoising_start=0.8,          # continue where base stopped
+        generator=g,
     ).images[0]
+
     return image
+
 
 # -----------------------------
 # CLI
@@ -208,6 +264,15 @@ def parse_args():
     p.add_argument("--dtype", default="fp16", choices=["fp16","fp32"], help="Pipe dtype")
     p.add_argument("--gender", choices=["male","female"], help="Force gender across the run (optional)")
     p.add_argument("--ethnicity", help="Force a single ethnicity for the whole run (optional)")
+    p.add_argument("--guidance-rescale", type=float, default=0.0,
+               help="CFG rescale (0=off). Try 0.6–0.8 to reduce distortion.")
+    p.add_argument("--use-refiner", action="store_true",
+                help="Use SDXL Refiner for last 20% denoise to clean micro-features (eyes/skin).")
+    p.add_argument("--refiner-model", default="stabilityai/stable-diffusion-xl-refiner-1.0",
+                help="Refiner model repo id")
+    p.add_argument("--refiner-steps", type=int, default=20,
+                help="Steps for the refiner stage (denoising_start=0.8).")
+
 
     return p.parse_args()
 
@@ -296,12 +361,15 @@ def main():
             img = generate_one(
                 pipe=pipe,
                 prompt=prompt,
-                negative_prompt=args.neg,
+                negative_prompt=args.neg,   # unchanged
                 seed=seed,
                 steps=steps,
                 cfg=cfg,
                 width=args.width,
                 height=args.height,
+                guidance_rescale=args.guidance_rescale,
+                refiner=refiner,
+                refiner_steps=args.refiner_steps,
             )
 
             name = f"seed_{seed:06d}.png"
