@@ -58,10 +58,11 @@ def load_sdxl(model_id: str, dtype=torch.float16, device: str = "cuda"):
     # For your diffusers version, use *torch_dtype* (not dtype)
     pipe = StableDiffusionXLPipeline.from_pretrained(
         model_id,
-        dtype=dtype,
+        torch_dtype=dtype,
         use_safetensors=True,
         low_cpu_mem_usage=False,  # avoid the offload_state_dict path that caused earlier errors
     ).to(device)
+    print("UNet dtype:", next(pipe.unet.parameters()).dtype)  # should be torch.float16
 
     # Memory savers that matter on ~15 GB GPUs at 1024x1024
     pipe.enable_attention_slicing()
