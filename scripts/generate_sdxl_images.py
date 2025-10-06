@@ -197,14 +197,12 @@ def generate_one(pipe, prompt, negative_prompt, seed, steps, cfg, width, height,
         generator=g,
         output_type="latent"   # keep latents for refiner
     )
-    base_latents = getattr(base, "images", None)
-    if base_latents is None:
-        base_latents = getattr(base, "latents")  # fallback for older versions
-
+    base_latents = base.images
+    
     image = refiner(
         prompt=prompt,
         negative_prompt=negative_prompt,
-        image=base.latents,
+        image=base_latents,
         num_inference_steps=int(refiner_steps),
         guidance_scale=float(cfg),
         guidance_rescale=float(guidance_rescale) if guidance_rescale > 0 else None,
