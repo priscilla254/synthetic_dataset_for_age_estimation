@@ -2,7 +2,8 @@
 # generate_sdxl_images_wildcards.py
 
 import os
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # optional, helps OOM
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"  # makes cuBLAS deterministic
 
 import csv
 import argparse
