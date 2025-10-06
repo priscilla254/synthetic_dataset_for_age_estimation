@@ -60,7 +60,7 @@ def load_sdxl(model_id: str, dtype=torch.float16, device: str = "cuda"):
     # Use torch_dtype to ensure fp16 across diffusers versions
     pipe = StableDiffusionXLPipeline.from_pretrained(
         model_id,
-        torch_dtype=dtype,
+        dtype=dtype,
         use_safetensors=True,
         low_cpu_mem_usage=False,
     ).to(device)
@@ -197,6 +197,9 @@ def generate_one(pipe, prompt, negative_prompt, seed, steps, cfg, width, height,
         generator=g,
         output_type="latent"   # keep latents for refiner
     )
+    base_latents = getattr(base, "images", None)
+    if base_latents is None:
+        base_latents = getattr(base, "latents")  # fallback for older versions
 
     image = refiner(
         prompt=prompt,
