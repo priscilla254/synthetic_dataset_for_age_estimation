@@ -60,7 +60,7 @@ def load_sdxl(model_id: str, dtype=torch.float16, device: str = "cuda"):
     # Use torch_dtype to ensure fp16 across diffusers versions
     pipe = StableDiffusionXLPipeline.from_pretrained(
         model_id,
-        dtype=dtype,
+        torch_dtype=dtype,
         use_safetensors=True,
         low_cpu_mem_usage=False,
     ).to(device)
