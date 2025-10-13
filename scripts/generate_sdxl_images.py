@@ -57,11 +57,12 @@ def set_scheduler(pipe, name: str):
 # -----------------------------
 # Load model/pipeline (base only)
 # -----------------------------
-def load_sdxl(model_id: str, dtype=torch.float16, device: str = "cuda"):
+def load_sdxl(model_id: str, device: str = "cuda"):
     # Use torch_dtype to ensure fp16 across diffusers versions
+    torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     pipe = StableDiffusionXLPipeline.from_pretrained(
         model_id,
-        torchdtype=dtype,
+        torch_dtype=torch_dtype,
         use_safetensors=True,
         low_cpu_mem_usage=False,
         device_map=None,
@@ -291,7 +292,7 @@ def main():
     set_determinism(not args.nondeterministic)
 
     dtype = torch.float16 if args.dtype == "fp16" else torch.float32
-    pipe = load_sdxl(args.model, dtype=dtype, device=args.device)
+    pipe = load_sdxl(args.model, device=args.device)
 
     # Load refiner only if requested
     refiner = None
@@ -302,6 +303,7 @@ def main():
             torch_dtype=torch.float16,
             use_safetensors=True,
             low_cpu_mem_usage=False,
+            device_map=None,
         ).to(args.device)
         try:
             refiner.enable_xformers_memory_efficient_attention()
