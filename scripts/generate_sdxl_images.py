@@ -122,10 +122,11 @@ def build_prompt(
     genders, ages,
     bg_light_pairs,
     poses, focals, expressions,
-    hairstyles_male, hairstyles_female, ethnicities,
+    hairstyles_male, hairstyles_female, ethnicities,facial_features,
     force_gender=None,
     force_ethnicity=None,
 ):
+    features = random.choice(facial_features) if facial_features else None
     ethnicity = force_ethnicity if force_ethnicity else random.choice(ethnicities or ["diverse background"])
     gender = force_gender if force_gender in ["male", "female"] else random.choice(genders or ["person"])
 
@@ -146,6 +147,7 @@ def build_prompt(
         base_prompt,
         f"portrait of a {gender}" + (f" {age} year old" if age is not None else ""),
         f"of {ethnicity}",
+        features,
         expr,
         focal,
         bglt,
@@ -170,7 +172,8 @@ def build_prompt(
 # -----------------------------
 def generate_one(pipe, prompt, negative_prompt, seed, steps, cfg, width, height,
                  guidance_rescale=0.0, refiner=None, refiner_steps=20):
-    g = torch.Generator(device=pipe.device).manual_seed(int(seed))
+    identity_seed = seed + 100000
+    g = torch.Generator(device=pipe.device).manual_seed(int(identity_seed))
 
     if refiner is None:
         result = pipe(
