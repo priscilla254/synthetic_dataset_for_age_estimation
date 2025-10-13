@@ -4,6 +4,7 @@
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # optional, helps OOM
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"  # makes cuBLAS deterministic
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 import csv
 import argparse
@@ -60,7 +61,7 @@ def load_sdxl(model_id: str, dtype=torch.float16, device: str = "cuda"):
     # Use torch_dtype to ensure fp16 across diffusers versions
     pipe = StableDiffusionXLPipeline.from_pretrained(
         model_id,
-        torch_dtype=dtype,
+        dtype=dtype,
         use_safetensors=True,
         low_cpu_mem_usage=False,
     ).to(device)
