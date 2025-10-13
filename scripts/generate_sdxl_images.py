@@ -63,7 +63,7 @@ def load_sdxl(model_id: str, dtype=torch.float16, device: str = "cuda"):
         model_id,
         torchdtype=dtype,
         use_safetensors=True,
-        low_cpu_mem_usage=False
+        low_cpu_mem_usage=False,
         device_map=None,
     ).to(device)
 
