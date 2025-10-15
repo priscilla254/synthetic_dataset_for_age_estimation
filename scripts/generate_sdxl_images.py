@@ -5,6 +5,7 @@ import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # optional, helps OOM
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"  # makes cuBLAS deterministic
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["TRANSFORMERS_OFFLOAD_STATE_DICT"] = "0"
 
 import csv
 import argparse
@@ -58,15 +59,15 @@ def set_scheduler(pipe, name: str):
 # Load model/pipeline (base only)
 # -----------------------------
 def load_sdxl(model_id: str, device: str = "cuda"):
-    # Use torch_dtype to ensure fp16 across diffusers versions
-    torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+    # Remove torch_dtype and use simpler loading
     pipe = StableDiffusionXLPipeline.from_pretrained(
         model_id,
-        torch_dtype=torch_dtype,
         use_safetensors=True,
-        low_cpu_mem_usage=False,
-        device_map=None,
     ).to(device)
+
+    # Set dtype after loading
+    if torch.cuda.is_available():
+        pipe = pipe.to(torch.float16)
 
     # Memory savers
     pipe.enable_attention_slicing()
@@ -343,7 +344,13 @@ def main():
     hair_male   = read_list(wildcard_dir, "hairstyles_male.txt", ["short curls","twists","afro","locs","buzz cut"])
     hair_female = read_list(wildcard_dir, "hairstyles_female.txt", ["short curls","braids","twists","afro","locs"])
     ethnicities = read_list(wildcard_dir, "ethnicities.txt", ["Black or African descent"])
-
+    facial_features = read_list(wildcard_dir, "facial_features.txt", [
+    "with prominent cheekbones and almond eyes",
+    "with rounded face shape and full lips", 
+    "with angular jawline and hooded eyes",
+    "with heart-shaped face and wide-set eyes",
+    "with strong brow bone and deep-set eyes"
+])
     # ----- Seeds -----
     seeds = [args.start_seed + i for i in range(args.num)]
 
@@ -375,6 +382,7 @@ def main():
                 hairstyles_male=hair_male,
                 hairstyles_female=hair_female,
                 ethnicities=ethnicities,
+                facial_features=facial_features,
                 force_gender=args.gender,
                 force_ethnicity=args.ethnicity,
             )
