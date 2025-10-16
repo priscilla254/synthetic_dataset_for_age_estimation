@@ -7,9 +7,11 @@ os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"  # makes cuBLAS deterministic
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TRANSFORMERS_OFFLOAD_STATE_DICT"] = "0"
 
+from datetime import datetime
 import csv
 import argparse
 import random
+import secrets
 from pathlib import Path
 
 import torch
@@ -59,7 +61,6 @@ def set_scheduler(pipe, name: str):
 # Load model/pipeline (base only)
 # -----------------------------
 def load_sdxl(model_id: str, device: str = "cuda"):
-    # Remove torch_dtype and use simpler loading
     pipe = StableDiffusionXLPipeline.from_pretrained(
         model_id,
         use_safetensors=True,
@@ -126,7 +127,7 @@ def build_prompt(
     genders, ages,
     bg_light_pairs,
     poses, focals, expressions,
-    hairstyles_male, hairstyles_female, ethnicities,facial_features,
+    hairstyles_male, hairstyles_female, ethnicities, facial_features,
     force_gender=None,
     force_ethnicity=None,
 ):
@@ -176,8 +177,8 @@ def build_prompt(
 # -----------------------------
 def generate_one(pipe, prompt, negative_prompt, seed, steps, cfg, width, height,
                  guidance_rescale=0.0, refiner=None, refiner_steps=20):
-    identity_seed = seed + 100000
-    g = torch.Generator(device=pipe.device).manual_seed(int(identity_seed))
+    # Fresh noise every time: use the seed directly (no identity offset)
+    g = torch.Generator(device=pipe.device).manual_seed(int(seed))
 
     if refiner is None:
         result = pipe(
@@ -220,33 +221,29 @@ def generate_one(pipe, prompt, negative_prompt, seed, steps, cfg, width, height,
     return image
 
 # -----------------------------
-# Drive helper (Colab-friendly)
+# Output directory (server-friendly)
 # -----------------------------
 def ensure_out_dir(path_str: str) -> Path:
-    path = Path(path_str)
-    if str(path).startswith("/content/drive") and not Path("/content/drive/MyDrive").exists():
-        try:
-            from google.colab import drive
-            drive.mount("/content/drive")
-        except Exception:
-            pass
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    base = Path(path_str).expanduser().resolve()
+    run = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out = base / run
+    out.mkdir(parents=True, exist_ok=True)
+    return out
 
 # -----------------------------
 # CLI
 # -----------------------------
 def parse_args():
     p = argparse.ArgumentParser("Generate SDXL images with wildcard prompts")
-    p.add_argument("--out", default="/content/drive/MyDrive/ai-workspace",
-                   help="Output folder for PNGs (e.g., /content/drive/MyDrive/ai-workspace)")
+    p.add_argument("--out", default="output",
+                   help="Output folder for PNGs (relative paths are created under the current directory)")
     p.add_argument("--model", default=DEFAULT_MODEL, help="SDXL model id/repo")
     p.add_argument("--wildcards", required=True, help="Folder containing wildcard .txt files")
     p.add_argument("--neg", default=DEFAULT_NEG, help="Negative prompt (string)")
     p.add_argument("--base-prompt", default=DEFAULT_BASE_PROMPT, help="Base content added to all prompts")
 
     p.add_argument("--num", type=int, default=100, help="How many images to generate")
-    p.add_argument("--start-seed", type=int, default=1000, help="First seed (inclusive)")
+    p.add_argument("--start-seed", type=int, default=1000, help="(unused if using random seeds)")
     p.add_argument("--width", type=int, default=1024)
     p.add_argument("--height", type=int, default=1024)
 
@@ -292,7 +289,8 @@ def main():
 
     set_determinism(not args.nondeterministic)
 
-    dtype = torch.float16 if args.dtype == "fp16" else torch.float32
+    # dtype flag is kept for compatibility, but the pipe dtype is set in load_sdxl
+    _ = torch.float16 if args.dtype == "fp16" else torch.float32
     pipe = load_sdxl(args.model, device=args.device)
 
     # Load refiner only if requested
@@ -345,14 +343,15 @@ def main():
     hair_female = read_list(wildcard_dir, "hairstyles_female.txt", ["short curls","braids","twists","afro","locs"])
     ethnicities = read_list(wildcard_dir, "ethnicities.txt", ["Black or African descent"])
     facial_features = read_list(wildcard_dir, "facial_features.txt", [
-    "with prominent cheekbones and almond eyes",
-    "with rounded face shape and full lips", 
-    "with angular jawline and hooded eyes",
-    "with heart-shaped face and wide-set eyes",
-    "with strong brow bone and deep-set eyes"
-])
-    # ----- Seeds -----
-    seeds = [args.start_seed + i for i in range(args.num)]
+        "with prominent cheekbones and almond eyes",
+        "with rounded face shape and full lips", 
+        "with angular jawline and hooded eyes",
+        "with heart-shaped face and wide-set eyes",
+        "with strong brow bone and deep-set eyes"
+    ])
+
+    # ----- Random seeds (true fresh noise per image) -----
+    seeds = [secrets.randbelow(10**12) for _ in range(args.num)]
 
     # ----- Manifest -----
     write_header = not manifest_path.exists()
@@ -401,7 +400,7 @@ def main():
                 refiner_steps=args.refiner_steps,
             )
 
-            name = f"seed_{seed:06d}.png"
+            name = f"seed_{seed:012d}.png"
             img.save(str(out_dir / name))
             del img
             torch.cuda.empty_cache()
