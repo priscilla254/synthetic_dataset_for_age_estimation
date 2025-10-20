@@ -1,5 +1,322 @@
+# Facial features wildcard list for SDXL prompting
+# Each line is a self-contained clause appended to the portrait prompt.
+# The loader ignores lines starting with '#'.
+
+# Face shapes
+with oval face shape
+with round face shape
+with square face shape
+with rectangle face shape
+with heart-shaped face
+with diamond face shape
+with triangle face shape
+with inverted triangle face shape
+with long narrow face
+with short wide face
+
+# Jawline and chin
+with angular jawline
+with soft rounded jawline
+with strong defined jawline
+with narrow jawline
+with broad jawline
+with tapered jawline
+with cleft chin
+with pointed chin
+with rounded chin
+with prominent chin
+with recessed chin
+
+# Cheekbones and cheeks
+with high prominent cheekbones
+with medium cheekbones
+with low subtle cheekbones
+with wide cheekbones
+with narrow cheekbones
+with full cheeks
+with hollow cheeks
+with slightly gaunt cheeks
+with baby cheeks
+
+# Brow ridge and forehead
+with strong brow bone
+with subtle brow ridge
+with smooth brow ridge
+with tall forehead
+with medium forehead
+with short forehead
+with rounded forehead
+with sloping forehead
+
+# Eyebrows: density, shape, position
+with thick straight eyebrows
+with thick arched eyebrows
+with thick slightly arched eyebrows
+with medium arched eyebrows
+with medium straight eyebrows
+with thin arched eyebrows
+with thin straight eyebrows
+with upward-tilted eyebrows
+with downward-tilted eyebrows
+with high-set eyebrows
+with low-set eyebrows
+with close-set eyebrows
+with wide-set eyebrows
+with naturally bushy eyebrows
+with groomed defined eyebrows
+with feathered fluffy eyebrows
+with sharp angular eyebrows
+with soft rounded eyebrows
+
+# Eyes: shape
+with almond eyes
+with round eyes
+with hooded eyes
+with monolid eyes
+with deep-set eyes
+with protruding eyes
+with upturned eyes
+with downturned eyes
+with wide-set eyes
+with close-set eyes
+with narrow eyes
+with large expressive eyes
+with small subtle eyes
+
+# Eyes: iris colors and details
+with dark brown eyes
+with medium brown eyes
+with light brown eyes
+with hazel eyes
+with amber eyes
+with golden brown eyes
+with green eyes
+with olive green eyes
+with blue eyes
+with light blue eyes
+with gray eyes
+with steel gray eyes
+with heterochromia eyes
+with flecked irises
+with ringed limbal rings
+with bright clear irises
+
+# Eyelids and lashes
+with prominent double eyelids
+with subtle double eyelids
+with smooth monolids
+with long eyelashes
+with short eyelashes
+with straight eyelashes
+with curled eyelashes
+with dense eyelashes
+with sparse eyelashes
+
+# Nose: size, bridge, tip, nostrils
+with small delicate nose
+with medium balanced nose
+with large prominent nose
+with straight nose
+with aquiline nose
+with Roman nose
+with button nose
+with snub nose
+with upturned nose
+with downturned nose
+with bulbous nose tip
+with narrow nose tip
+with wide nose bridge
+with narrow nose bridge
+with high nose bridge
+with low nose bridge
+with flared nostrils
+with narrow nostrils
+
+# Lips and mouth
+with full lips
+with medium lips
+with thin lips
+with defined cupid's bow
+with subtle cupid's bow
+with heart-shaped lips
+with wide mouth
+with small mouth
+with downturned lip corners
+with upturned lip corners
+with prominent lower lip
+with prominent upper lip
+
+# Teeth and smile (neutral descriptors only)
+with straight white teeth
+with slightly gapped front teeth
+with small even teeth
+with visible canines
+
+# Ears
+with small ears
+with medium ears
+with large ears
+with protruding ears
+with close-to-head ears
+with attached earlobes
+with detached earlobes
+with defined antihelix
+
+# Skin: tone and undertone (neutral, not ethnicity-specific)
+with very fair skin tone
+with fair skin tone
+with light skin tone
+with medium skin tone
+with tan skin tone
+with deep skin tone
+with very deep skin tone
+with cool undertone
+with warm undertone
+with neutral undertone
+with olive undertone
+
+# Skin: texture and details
+with smooth skin texture
+with visible pores
+with subtle fine lines
+with natural shine on T-zone
+with matte skin finish
+with dewy skin finish
+with light freckles
+with many freckles
+with sun-kissed freckles
+with beauty marks
+with a facial mole
+with faint under-eye circles
+with pronounced under-eye hollows
+with nasolabial folds
+with faint smile lines
+with mild rosiness on cheeks
+with even skin tone
+with slight hyperpigmentation
+with melasma patches
+with vitiligo patches
+with a faint scar on the cheek
+with a faint scar on the eyebrow
+with a faint scar on the lip
+with acne-prone skin
+with a few blemishes
+with healed acne marks
+with pitted acne scars
+with smooth shaved skin
+with light peach fuzz
+
+# Facial hair (useful for male or older prompts)
+with clean-shaven face
+with five o'clock shadow
+with light stubble
+with heavy stubble
+with short trimmed beard
+with medium full beard
+with long full beard
+with goatee beard
+with van dyke beard
+with circle beard
+with soul patch
+with thin mustache
+with thick mustache
+with handlebar mustache
+with chevron mustache
+
+# Hairline/temples (facial framing)
+with low hairline
+with high hairline
+with widow's peak
+with straight hairline
+with receding temples
+with baby hairs along the hairline
+
+# Facial proportions
+with balanced facial proportions
+with slightly long mid-face
+with short mid-face
+with long lower face
+with short lower face
+with broad mid-face
+with narrow mid-face
+
+# Composite combos (multi-feature)
 with prominent cheekbones and almond eyes
 with rounded face shape and full lips
 with angular jawline and hooded eyes
 with heart-shaped face and wide-set eyes
 with strong brow bone and deep-set eyes
+with diamond face shape and pointed chin
+with square face and strong defined jawline
+with oval face and straight nose
+with round face and button nose
+with high cheekbones and thin lips
+with soft jawline and full lips
+with narrow nose bridge and wide nostrils
+with high-set eyebrows and deep-set eyes
+with thick arched eyebrows and almond eyes
+with thin straight eyebrows and round eyes
+with upturned eyes and defined cupid's bow
+with downturned eyes and prominent lower lip
+with aquiline nose and hollow cheeks
+with bulbous nose tip and wide mouth
+with small delicate nose and heart-shaped lips
+with cleft chin and strong jawline
+with recessed chin and full cheeks
+with tall forehead and low-set eyebrows
+with short forehead and high-set eyebrows
+with monolid eyes and straight eyebrows
+with double eyelids and curled eyelashes
+with long eyelashes and large expressive eyes
+with short eyelashes and small subtle eyes
+with green eyes and flecked irises
+with blue eyes and dark limbal rings
+with hazel eyes and bright clear irises
+with gray eyes and ringed limbal rings
+with light freckles and beauty marks
+with many freckles and dewy skin finish
+with matte skin finish and visible pores
+with dewy skin finish and smooth skin texture
+with faint under-eye circles and nasolabial folds
+with faint scar on the eyebrow and thick eyebrows
+with faint scar on the lip and defined cupid's bow
+with acne-prone skin and healed acne marks
+with pitted acne scars and smooth shaved skin
+with five o'clock shadow and strong jawline
+with light stubble and prominent cheekbones
+with trimmed beard and square jawline
+with circle beard and small mouth
+with handlebar mustache and medium full beard
+with chevron mustache and narrow nose bridge
+with widow's peak and high forehead
+with straight hairline and rounded forehead
+with receding temples and angular jawline
+
+# Subtle asymmetries (realism)
+with slightly asymmetric eyes
+with slightly asymmetric eyebrows
+with slightly asymmetric nostrils
+with slightly asymmetric lips
+with slightly asymmetric jawline
+
+# Age-related features (neutral wording)
+with faint crow's feet
+with mild forehead lines
+with subtle marionette lines
+with softer skin elasticity
+with slightly textured under-eyes
+
+# Piercings and facial accessories (optional)
+with small nose stud
+with septum ring
+with subtle eyebrow piercing
+with small labret stud
+with small beauty spot sticker
+
+# Minimal descriptors for flexible mixing
+with defined features
+with delicate features
+with soft features
+with sharp features
+with refined features
+with striking features

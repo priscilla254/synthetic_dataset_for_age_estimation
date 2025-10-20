@@ -34,7 +34,7 @@ DEFAULT_NEG = (
     "overprocessed, plastic skin, beauty filter, hdr, dramatic rim light, profile, "
     "looking away, head tilted, closed eyes, sunglasses, hat, hair covering face, "
     "multiple people, duplicate faces, watermark, text, logo, busy background, "
-    "deformed eyes, extra pupils, cross-eyed, asymmetrical eyes, lopsided irises"
+    "deformed eyes, extra pupils, cross-eyed, asymmetrical eyes, lopsided irises, over-sharpened skin"
 )
 
 # -----------------------------
@@ -247,8 +247,8 @@ def parse_args():
     p.add_argument("--width", type=int, default=1024)
     p.add_argument("--height", type=int, default=1024)
 
-    p.add_argument("--steps", type=int, default=30, help="Default steps if no jitter")
-    p.add_argument("--cfg", type=float, default=6.5, help="Default CFG if no jitter")
+    p.add_argument("--steps", type=int, default=40, help="Default steps if no jitter")
+    p.add_argument("--cfg", type=float, default=7.0, help="Default CFG if no jitter")
     p.add_argument("--jitter-steps", action="store_true", help="Randomize steps per image")
     p.add_argument("--min-steps", type=int, default=25)
     p.add_argument("--max-steps", type=int, default=35)
