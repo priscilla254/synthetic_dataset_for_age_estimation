@@ -25,7 +25,7 @@ from diffusers import (
 DEFAULT_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
 
 DEFAULT_BASE_PROMPT = (
-    "passport-style headshot, photorealistic, high detail, realistic skin texture, shallow depth of field"
+    "age verification photo, security camera quality, unprocessed, natural lighting, authentic skin"
 )
 
 # Valid Python string; same content you wanted
@@ -34,7 +34,12 @@ DEFAULT_NEG = (
     "overprocessed, plastic skin, beauty filter, hdr, dramatic rim light, profile, "
     "looking away, head tilted, closed eyes, sunglasses, hat, hair covering face, "
     "multiple people, duplicate faces, watermark, text, logo, busy background, "
-    "deformed eyes, extra pupils, cross-eyed, asymmetrical eyes, lopsided irises, over-sharpened skin"
+    "deformed eyes, extra pupils, cross-eyed, asymmetrical eyes, lopsided irises, "
+    "studio lighting, professional photography, glamour shot, fashion photography, "
+    "perfect skin, flawless skin, airbrushed, retouched, enhanced, polished, "
+    "artistic, cinematic, dramatic, perfect composition, perfect lighting, "
+    "high-end photography, luxury photography, commercial photography,"
+    "black and white monochrome, grayscale, desaturated"
 )
 
 # -----------------------------
@@ -127,18 +132,36 @@ def build_prompt(
     genders, ages,
     bg_light_pairs,
     poses, focals, expressions,
-    hairstyles_male, hairstyles_female, ethnicities, facial_features,
+    hairstyles_male_by_eth, hairstyles_female_by_eth,
+    ethnicities, facial_features,
+    ethnicity_key_map,
     force_gender=None,
     force_ethnicity=None,
 ):
     features = random.choice(facial_features) if facial_features else None
     ethnicity = force_ethnicity if force_ethnicity else random.choice(ethnicities or ["diverse background"])
     gender = force_gender if force_gender in ["male", "female"] else random.choice(genders or ["person"])
+    eth_key = ethnicity_key_map.get(ethnicity)
 
-    if gender == "male" and hairstyles_male:
-        hair = random.choice(hairstyles_male)
-    elif gender == "female" and hairstyles_female:
-        hair = random.choice(hairstyles_female)
+    # Choose hairstyle pool tied to ethnicity when possible, else fall back to base lists
+    if gender == "male":
+        pool = []
+        if eth_key and hairstyles_male_by_eth.get(eth_key):
+            pool = hairstyles_male_by_eth[eth_key]
+        elif hairstyles_male:
+            pool = hairstyles_male
+        else:
+            pool = hairstyles_female
+        hair = random.choice(pool or ["short hair","medium hair","long hair"])
+    elif gender == "female":
+        pool = []
+        if eth_key and hairstyles_female_by_eth.get(eth_key):
+            pool = hairstyles_female_by_eth[eth_key]
+        elif hairstyles_female:
+            pool = hairstyles_female
+        else:
+            pool = hairstyles_male
+        hair = random.choice(pool or ["short hair","medium hair","long hair"])
     else:
         hair = random.choice((hairstyles_male + hairstyles_female) or ["short hair","medium hair","long hair"])
 
@@ -148,20 +171,40 @@ def build_prompt(
     focal = random.choice(focals) if focals else None
     expr  = random.choice(expressions) if expressions else None
 
-    parts = [
-        base_prompt,
-        f"portrait of a {gender}" + (f" {age} year old" if age is not None else ""),
-        f"of {ethnicity}",
-        features,
-        expr,
-        focal,
-        bglt,
-        (f"{pose} pose" if pose else None),
-        hair,
-    ]
-    prompt = ", ".join([p for p in parts if p and str(p).strip()])
+    # Build concise prompt structure
+    prompt_parts = []
+    
+    # Core subject (concise)
+    subject_desc = f"{gender}"
+    if age is not None:
+        subject_desc += f", {age}"
+    subject_desc += f", {ethnicity}"
+    prompt_parts.append(subject_desc)
+    
+    # Key features only
+    if features:
+        prompt_parts.append(features)
+    if hair:
+        prompt_parts.append(hair)
+    
+    # Photography elements (grouped)
+    photo_elements = []
+    if pose:
+        photo_elements.append(pose)
+    if expr:
+        photo_elements.append(expr)
+    
+    if photo_elements:
+        prompt_parts.append(", ".join(photo_elements))
+    
+    # Background/lighting (essential only)
+    if bglt:
+        prompt_parts.append(bglt)
+    
+    # Combine with base prompt
+    full_prompt = f"{base_prompt}, {', '.join(prompt_parts)}"
 
-    return prompt, {
+    return full_prompt, {
         "gender": gender,
         "age": age if age is not None else "",
         "hair": hair,
@@ -181,42 +224,54 @@ def generate_one(pipe, prompt, negative_prompt, seed, steps, cfg, width, height,
     g = torch.Generator(device=pipe.device).manual_seed(int(seed))
 
     if refiner is None:
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            num_inference_steps=int(steps),
-            guidance_scale=float(cfg),
-            guidance_rescale=float(guidance_rescale) if guidance_rescale > 0 else None,
-            width=int(width),
-            height=int(height),
-            generator=g,
-        )
+        kwargs = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "num_inference_steps": int(steps),
+            "guidance_scale": float(cfg),
+            "width": int(width),
+            "height": int(height),
+            "generator": g,
+            "num_images_per_prompt": 1,
+            "output_type": "pil",
+        }
+        if guidance_rescale > 0:
+            kwargs["guidance_rescale"] = float(guidance_rescale)
+        
+        result = pipe(**kwargs)
         return result.images[0]
 
-    base = pipe(
-        prompt=prompt,
-        negative_prompt=negative_prompt,
-        num_inference_steps=int(steps),
-        guidance_scale=float(cfg),
-        guidance_rescale=float(guidance_rescale) if guidance_rescale > 0 else None,
-        width=int(width),
-        height=int(height),
-        denoising_end=0.8,     # stop early, handoff to refiner
-        generator=g,
-        output_type="latent"   # keep latents for refiner
-    )
+    base_kwargs = {
+        "prompt": prompt,
+        "negative_prompt": negative_prompt,
+        "num_inference_steps": int(steps),
+        "guidance_scale": float(cfg),
+        "width": int(width),
+        "height": int(height),
+        "denoising_end": 0.8,     # stop early, handoff to refiner
+        "generator": g,
+        "output_type": "latent",# keep latents for refiner
+        "num_images_per_prompt": 1,   
+    }
+    if guidance_rescale > 0:
+        base_kwargs["guidance_rescale"] = float(guidance_rescale)
+    
+    base = pipe(**base_kwargs)
     base_latents = base.images
     
-    image = refiner(
-        prompt=prompt,
-        negative_prompt=negative_prompt,
-        image=base_latents,
-        num_inference_steps=int(refiner_steps),
-        guidance_scale=float(cfg),
-        guidance_rescale=float(guidance_rescale) if guidance_rescale > 0 else None,
-        denoising_start=0.8,   # continue where base stopped
-        generator=g,
-    ).images[0]
+    refiner_kwargs = {
+        "prompt": prompt,
+        "negative_prompt": negative_prompt,
+        "image": base_latents,
+        "num_inference_steps": int(refiner_steps),
+        "guidance_scale": float(cfg),
+        "denoising_start": 0.8,   # continue where base stopped
+        "generator": g,
+    }
+    if guidance_rescale > 0:
+        refiner_kwargs["guidance_rescale"] = float(guidance_rescale)
+    
+    image = refiner(**refiner_kwargs).images[0]
 
     return image
 
@@ -248,15 +303,15 @@ def parse_args():
     p.add_argument("--height", type=int, default=1024)
 
     p.add_argument("--steps", type=int, default=40, help="Default steps if no jitter")
-    p.add_argument("--cfg", type=float, default=7.0, help="Default CFG if no jitter")
+    p.add_argument("--cfg", type=float, default=5.5, help="Default CFG if no jitter")
     p.add_argument("--jitter-steps", action="store_true", help="Randomize steps per image")
-    p.add_argument("--min-steps", type=int, default=25)
-    p.add_argument("--max-steps", type=int, default=35)
+    p.add_argument("--min-steps", type=int, default=34)
+    p.add_argument("--max-steps", type=int, default=44)
     p.add_argument("--jitter-cfg", action="store_true", help="Randomize CFG per image")
-    p.add_argument("--min-cfg", type=float, default=5.0)
-    p.add_argument("--max-cfg", type=float, default=8.0)
+    p.add_argument("--min-cfg", type=float, default=4.8)
+    p.add_argument("--max-cfg", type=float, default=5.8)
 
-    p.add_argument("--sched", default="dpm", choices=["dpm","heun","euler_a","rotate"], help="Sampler or rotate")
+    p.add_argument("--sched", default="heun", choices=["dpm","heun","euler_a","rotate"], help="Sampler or rotate")
     p.add_argument("--nondeterministic", action="store_true", help="Allow non-deterministic kernels")
     p.add_argument("--device", default="cuda", choices=["cuda","cpu"])
     p.add_argument("--dtype", default="fp16", choices=["fp16","fp32"], help="Pipe dtype")
@@ -264,13 +319,13 @@ def parse_args():
     p.add_argument("--ethnicity", help="Force a single ethnicity for the whole run (optional)")
 
     # Anti-deformation controls
-    p.add_argument("--guidance-rescale", type=float, default=0.0,
+    p.add_argument("--guidance-rescale", type=float, default=0.85,
                    help="CFG rescale (0=off). Try 0.6–0.8 to reduce distortion.")
-    p.add_argument("--use-refiner", action="store_true",
+    p.add_argument("--use-refiner", action="store_true", default=True,
                    help="Use SDXL Refiner for last 20% denoise to clean micro-features (eyes/skin).")
     p.add_argument("--refiner-model", default="stabilityai/stable-diffusion-xl-refiner-1.0",
                    help="Refiner model repo id")
-    p.add_argument("--refiner-steps", type=int, default=20,
+    p.add_argument("--refiner-steps", type=int, default=12,
                    help="Steps for the refiner stage (denoising_start=0.8).")
 
     return p.parse_args()
@@ -315,40 +370,50 @@ def main():
     schedulers = ["dpm","heun","euler_a"] if args.sched == "rotate" else [args.sched]
 
     # ----- Read wildcards -----
-    genders     = read_list(wildcard_dir, "genders.txt", ["male","female"])
-    ages_str    = read_list(wildcard_dir, "ages.txt", ["22","23","24","25","26","27"])
+    genders     = read_list(wildcard_dir, "genders", [])
+    ages_str    = read_list(wildcard_dir, "ages", [])
     ages        = [int(a) for a in ages_str if a.isdigit()]
 
     bg_light_pairs = read_pairs(
-        wildcard_dir, "bg_light.txt",
-        [
-            "neutral indoor background, under soft warm indoor lighting",
-            "neutral indoor background, under white fluorescent lighting",
-            "supermarket store, under harsh overhead store lighting",
-            "supermarket store, under white fluorescent lighting",
-            "liquor store, under harsh overhead store lighting",
-            "liquor store, under white fluorescent lighting",
-            "bedroom, under soft warm indoor lighting",
-            "bedroom, under colored lighting effects from a TV or neon signs",
-            "living room at home, under soft warm indoor lighting",
-            "living room at home, under colored lighting effects from a TV or neon signs",
-        ],
+        wildcard_dir, "bg_light",
+        []
     )
 
-    poses       = read_list(wildcard_dir, "poses.txt", ["frontal","slightly turned left","slightly turned right"])
-    focals      = read_list(wildcard_dir, "focals.txt", ["85mm portrait look","50mm natural perspective","105mm compressed portrait"])
-    expressions = read_list(wildcard_dir, "expressions.txt", ["neutral expression","subtle smile","calm expression"])
+    poses       = read_list(wildcard_dir, "poses", [])
+    focals      = read_list(wildcard_dir, "focals", [])
+    expressions = read_list(wildcard_dir, "expressions", [])
 
-    hair_male   = read_list(wildcard_dir, "hairstyles_male.txt", ["short curls","twists","afro","locs","buzz cut"])
-    hair_female = read_list(wildcard_dir, "hairstyles_female.txt", ["short curls","braids","twists","afro","locs"])
-    ethnicities = read_list(wildcard_dir, "ethnicities.txt", ["Black or African descent"])
-    facial_features = read_list(wildcard_dir, "facial_features.txt", [
-        "with prominent cheekbones and almond eyes",
-        "with rounded face shape and full lips", 
-        "with angular jawline and hooded eyes",
-        "with heart-shaped face and wide-set eyes",
-        "with strong brow bone and deep-set eyes"
-    ])
+    # Base hairstyle pools (filenames without .txt)
+    hair_male   = read_list(wildcard_dir, "hairstyles_male", [])
+    hair_female = read_list(wildcard_dir, "hairstyles_female", [])
+    ethnicities = read_list(wildcard_dir, "ethnicities", [])
+    # Map ethnicity strings to wildcard filename suffixes
+    ethnicity_key_map = {
+        "Black or African descent": "african",
+        "White or European descent": "european",
+        "East Asian descent": "east_asian",
+        "Southeast Asian descent": "southeast_asian",
+        "South Asian (Indian subcontinent) descent": "south_asian",
+        "Middle Eastern or North African descent": "middle_eastern",
+        "Latino or Hispanic descent": "latino",  # canonical key; handle female alt below
+    }
+
+    # Per-ethnicity hairstyle pools (both genders)
+    hair_male_by_eth = {}
+    hair_female_by_eth = {}
+    for k in ethnicity_key_map.values():
+        # male: try canonical, then alt gendered spelling if applicable
+        male_list = read_list(wildcard_dir, f"hairstyles_male_{k}", [])
+        if not male_list and k == "latino":
+            male_list = read_list(wildcard_dir, "hairstyles_male_latina", [])
+        hair_male_by_eth[k] = male_list
+
+        # female: try canonical, then alt
+        female_list = read_list(wildcard_dir, f"hairstyles_female_{k}", [])
+        if not female_list and k == "latino":
+            female_list = read_list(wildcard_dir, "hairstyles_female_latina", [])
+        hair_female_by_eth[k] = female_list
+    facial_features = read_list(wildcard_dir, "facial_features", [])
 
     # ----- Random seeds (true fresh noise per image) -----
     seeds = [secrets.randbelow(10**12) for _ in range(args.num)]
@@ -380,8 +445,11 @@ def main():
                 expressions=expressions,
                 hairstyles_male=hair_male,
                 hairstyles_female=hair_female,
+                hairstyles_male_by_eth=hair_male_by_eth,
+                hairstyles_female_by_eth=hair_female_by_eth,
                 ethnicities=ethnicities,
                 facial_features=facial_features,
+                ethnicity_key_map=ethnicity_key_map,
                 force_gender=args.gender,
                 force_ethnicity=args.ethnicity,
             )
